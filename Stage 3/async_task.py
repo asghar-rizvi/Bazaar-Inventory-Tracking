@@ -1,4 +1,3 @@
-# celery_worker.py
 from celery import Celery
 from datetime import datetime
 import os

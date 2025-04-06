@@ -1,4 +1,3 @@
-# app_factory.py - Create a factory pattern to resolve circular imports
 from flask import Flask
 from flask_httpauth import HTTPBasicAuth
 from flask_sqlalchemy import SQLAlchemy
@@ -14,14 +13,17 @@ cache = Cache()
 auth = HTTPBasicAuth()
 socketio = SocketIO()
 
-def create_app(config=None):
+def create_app(register_blueprints=True):
     app = Flask(__name__)
     
     # Default Configuration
     app.config.update({
-        'SQLALCHEMY_DATABASE_URI': os.getenv('DB_URI', 'postgresql://postgres:asghar@localhost/Bazaar_Stage3'),
+        # MASTER (write) - port 5432
+        'SQLALCHEMY_DATABASE_URI': os.getenv('DB_URI', 'postgresql://postgres:asghar@localhost:5432/bazaar_stage3'),
+        
+        # REPLICA (read) - port 5433
         'SQLALCHEMY_BINDS': {
-            'replica': os.getenv('REPLICA_URI', 'postgresql://postgres:asghar@localhost/Bazaar_Stage3_Replica')
+            'replica': os.getenv('REPLICA_URI', 'postgresql://postgres:asghar@localhost:5433/bazaar_stage3')
         },
         'CACHE_TYPE': 'RedisCache',
         'CACHE_REDIS_URL': os.getenv('REDIS_URI', 'redis://localhost:6379/0'),
@@ -30,9 +32,8 @@ def create_app(config=None):
         'CELERY_RESULT_BACKEND': os.getenv('CELERY_BACKEND', 'redis://localhost:6379/0')
     })
 
-    # Override with custom config if provided
-    if config:
-        app.config.update(config)
+    # if config:
+    #     app.config.update(config)
     
     # Initialize extensions with app
     db.init_app(app)
@@ -48,8 +49,9 @@ def create_app(config=None):
     )
     
     # Register blueprints
-    from routes import api_bp
-    app.register_blueprint(api_bp)
+    if register_blueprints:
+        from routes import api_bp
+        app.register_blueprint(api_bp)
     print(app.config['SQLALCHEMY_DATABASE_URI'])
     print(app.config['SQLALCHEMY_BINDS']['replica'])
 

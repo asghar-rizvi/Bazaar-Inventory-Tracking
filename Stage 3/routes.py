@@ -86,8 +86,7 @@ def update_stock():
         "message": "Update processing started",
         "task_id": task.id
     }), 202
-    
-    
+
 @api_bp.route('/stock/<int:store_id>', methods=['GET'])
 @cache.cached(timeout=30, query_string=True)
 @auth.login_required
@@ -96,11 +95,12 @@ def get_stock(store_id):
     try:
         # Use the read replica for this query
         replica_engine = db.get_engine(current_app, bind='replica')
-        
-        # Create a session using the provided engine
-        Session = db.sessionmaker(bind=replica_engine)
-        
-        with Session() as session:
+        with current_app.app_context():
+            # Create a new session bound to the replica
+            session = db.create_scoped_session(
+                options={"bind": replica_engine}
+            )
+            
             stock = session.query(StoreInventory).filter_by(store_id=store_id).all()
             
             result = [{
@@ -152,3 +152,30 @@ def health_check():
         "status": "ok",
         "version": "1.0.0"
     })
+    
+@api_bp.route('/health', methods=['GET'])
+def health_check():
+    try:
+        # Test master
+        db.session.execute("SELECT 1")
+        
+        # Test replica
+        replica_engine = db.get_engine(current_app, bind='replica')
+        replica_engine.execute("SELECT 1")
+        
+        return jsonify({
+            "status": "ok",
+            "database": {
+                "master": "healthy",
+                "replica": "healthy"
+            }
+        })
+    except Exception as e:
+        current_app.logger.critical(f"DB health check failed: {e}")
+        return jsonify({
+            "status": "degraded",
+            "database": {
+                "master": "unhealthy" if "master" in str(e) else "healthy",
+                "replica": "unhealthy" if "replica" in str(e) else "healthy"
+            }
+        }), 500
