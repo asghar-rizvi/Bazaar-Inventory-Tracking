@@ -3,25 +3,41 @@ from flask_httpauth import HTTPBasicAuth
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from model import db, Store, ProductCatalog, StoreInventory, User
+import time
+import redis
+from flask import g
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:asghar@localhost/Bazaar Stage2'
 db.init_app(app)
 
 auth = HTTPBasicAuth()
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+
+THROTTLE_INTERVAL = 2 
+
+@app.before_request
+def redis_throttle():
+    ip = request.remote_addr
+    key = f"last_request:{ip}"
+    
+    last_request_time = r.get(key)
+    current_time = time.time()
+
+    if last_request_time:
+        elapsed = current_time - float(last_request_time)
+        if elapsed < THROTTLE_INTERVAL:
+            delay = THROTTLE_INTERVAL - elapsed
+            time.sleep(delay)  
+    
+    r.set(key, current_time, ex=60)  
 
 @auth.verify_password
 def verify_password(username, password):
     user = User.query.filter_by(username=username).first()
     if user and user.check_password(password):
         return username
-
-limiter = Limiter(
-    app=app, 
-    key_func=get_remote_address,  
-    default_limits=["15 per minute"]  
-)
-
 
 @app.route('/register', methods=['POST'])
 def register():
