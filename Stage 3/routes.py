@@ -1,4 +1,5 @@
 # routes.py
+from sqlalchemy.orm import scoped_session, sessionmaker
 from flask import Blueprint, request, jsonify, current_app, g
 from flask_socketio import join_room
 from app_factory import db, cache, auth, socketio
@@ -55,6 +56,55 @@ def handle_subscribe(data):
         socketio.emit('error', {'message': 'Missing store_id or product_id'})
 
 # API Endpoints
+
+@api_bp.route('/register', methods=['POST'])
+@validate_json('username', 'password')
+def register_user():
+    """Register a new user"""
+    try:
+        data = request.get_json()
+        
+        # Check if username already exists
+        if User.query.filter_by(username=data['username']).first():
+            return jsonify({"error": "Username already exists"}), 409
+            
+        # Create new user
+        new_user = User(username=data['username'])
+        new_user.set_password(data['password'])
+        
+        # Optional: Set admin status if provided
+        if 'is_admin' in data:
+            new_user.is_admin = bool(data['is_admin'])
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        # Create audit log
+        audit_log = AuditLog(
+            user_id=new_user.username,
+            action="USER_REGISTER",
+            record_type="USER",
+            record_id=new_user.id,
+            new_values={"username": new_user.username, "is_admin": new_user.is_admin}
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "user_id": new_user.id,
+            "username": new_user.username,
+            "is_admin": new_user.is_admin
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Registration failed: {e}")
+        return jsonify({"error": "Registration failed"}), 500
+
+
+
+
 @api_bp.route('/stock', methods=['POST'])
 @auth.login_required
 @validate_json('store_id', 'product_id', 'quantity')
@@ -87,20 +137,22 @@ def update_stock():
         "task_id": task.id
     }), 202
 
+
+
 @api_bp.route('/stock/<int:store_id>', methods=['GET'])
 @cache.cached(timeout=30, query_string=True)
 @auth.login_required
 def get_stock(store_id):
     """Cached read endpoint using replica database"""
     try:
-        # Use the read replica for this query
+        # Get the replica engine
         replica_engine = db.get_engine(current_app, bind='replica')
-        with current_app.app_context():
-            # Create a new session bound to the replica
-            session = db.create_scoped_session(
-                options={"bind": replica_engine}
-            )
-            
+        
+        # Create a new session explicitly
+        Session = scoped_session(sessionmaker(bind=replica_engine))
+        session = Session()
+        
+        try:
             stock = session.query(StoreInventory).filter_by(store_id=store_id).all()
             
             result = [{
@@ -110,9 +162,18 @@ def get_stock(store_id):
             } for item in stock]
             
             return jsonify(result)
+        finally:
+            session.remove()  # Important: clean up the session
+            
     except Exception as e:
-        current_app.logger.error(f"Error fetching stock: {e}")
-        return jsonify({"error": "Failed to fetch inventory data"}), 500
+        current_app.logger.error(f"Error fetching stock: {str(e)}")
+        # Fallback to master if replica fails
+        stock = StoreInventory.query.filter_by(store_id=store_id).all()
+        return jsonify([{
+            "product_id": item.product_id,
+            "quantity": item.quantity,
+            "last_updated": item.last_updated.isoformat()
+        } for item in stock])
 
 @api_bp.route('/audit/logs', methods=['GET'])
 @auth.login_required
@@ -145,13 +206,13 @@ def get_audit_logs():
         current_app.logger.error(f"Error fetching audit logs: {e}")
         return jsonify({"error": "Failed to fetch audit logs"}), 500
 
-@api_bp.route('/health', methods=['GET'])
-def health_check():
-    """Simple health check endpoint"""
-    return jsonify({
-        "status": "ok",
-        "version": "1.0.0"
-    })
+# @api_bp.route('/health', methods=['GET'])
+# def health_check():
+#     """Simple health check endpoint"""
+#     return jsonify({
+#         "status": "ok",
+#         "version": "1.0.0"
+#     })
     
 @api_bp.route('/health', methods=['GET'])
 def health_check():

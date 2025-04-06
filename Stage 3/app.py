@@ -1,4 +1,3 @@
-# app.py - Main application entry point
 from app_factory import create_app, socketio
 from model import db
 
