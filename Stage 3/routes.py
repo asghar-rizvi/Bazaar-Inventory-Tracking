@@ -6,11 +6,10 @@ from app_factory import db, cache, auth, socketio
 from model import User, AuditLog, StoreInventory
 from async_task import async_stock_update
 from functools import wraps
-import json
 
 api_bp = Blueprint('api', __name__)
 
-# Auth setup
+# User Validation 
 @auth.verify_password
 def verify_password(username, password):
     user = User.query.filter_by(username=username).first()
@@ -19,7 +18,7 @@ def verify_password(username, password):
         return username
     return None
 
-# Helper for input validation
+
 def validate_json(*required_fields):
     def decorator(f):
         @wraps(f)
@@ -55,12 +54,11 @@ def handle_subscribe(data):
     else:
         socketio.emit('error', {'message': 'Missing store_id or product_id'})
 
-# API Endpoints
+
 
 @api_bp.route('/register', methods=['POST'])
 @validate_json('username', 'password')
 def register_user():
-    """Register a new user"""
     try:
         data = request.get_json()
         
@@ -72,14 +70,12 @@ def register_user():
         new_user = User(username=data['username'])
         new_user.set_password(data['password'])
         
-        # Optional: Set admin status if provided
         if 'is_admin' in data:
             new_user.is_admin = bool(data['is_admin'])
         
         db.session.add(new_user)
         db.session.commit()
         
-        # Create audit log
         audit_log = AuditLog(
             user_id=new_user.username,
             action="USER_REGISTER",
@@ -104,7 +100,7 @@ def register_user():
 
 
 
-
+# EVENT DRIVEN ASYNC ACTION WITH CACHING
 @api_bp.route('/stock', methods=['POST'])
 @auth.login_required
 @validate_json('store_id', 'product_id', 'quantity')
@@ -112,10 +108,8 @@ def update_stock():
     """Async stock update endpoint"""
     data = request.get_json()
     
-    # Get current user for audit trail
     user_id = g.current_user.username if hasattr(g, 'current_user') else "system"
     
-    # Validate input data
     try:
         store_id = int(data['store_id'])
         product_id = int(data['product_id'])
@@ -123,7 +117,6 @@ def update_stock():
     except (ValueError, TypeError):
         return jsonify({"error": "Invalid data types"}), 400
     
-    # Queue the async task
     task = async_stock_update.delay(
         store_id=store_id,
         product_id=product_id,
@@ -143,12 +136,8 @@ def update_stock():
 @cache.cached(timeout=30, query_string=True)
 @auth.login_required
 def get_stock(store_id):
-    """Cached read endpoint using replica database"""
     try:
-        # Get the replica engine
         replica_engine = db.get_engine(current_app, bind='replica')
-        
-        # Create a new session explicitly
         Session = scoped_session(sessionmaker(bind=replica_engine))
         session = Session()
         
@@ -163,11 +152,10 @@ def get_stock(store_id):
             
             return jsonify(result)
         finally:
-            session.remove()  # Important: clean up the session
+            session.remove()  
             
     except Exception as e:
         current_app.logger.error(f"Error fetching stock: {str(e)}")
-        # Fallback to master if replica fails
         stock = StoreInventory.query.filter_by(store_id=store_id).all()
         return jsonify([{
             "product_id": item.product_id,
@@ -178,10 +166,9 @@ def get_stock(store_id):
 @api_bp.route('/audit/logs', methods=['GET'])
 @auth.login_required
 def get_audit_logs():
-    """Fetch audit logs"""
     try:
         page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 100, type=int), 100)  # Limit to 100 logs per page
+        per_page = min(request.args.get('per_page', 100, type=int), 100)  
         
         logs = AuditLog.query.order_by(
             AuditLog.created_at.desc()
@@ -206,13 +193,6 @@ def get_audit_logs():
         current_app.logger.error(f"Error fetching audit logs: {e}")
         return jsonify({"error": "Failed to fetch audit logs"}), 500
 
-# @api_bp.route('/health', methods=['GET'])
-# def health_check():
-#     """Simple health check endpoint"""
-#     return jsonify({
-#         "status": "ok",
-#         "version": "1.0.0"
-#     })
     
 @api_bp.route('/health', methods=['GET'])
 def health_check():

@@ -7,7 +7,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import os
 
-# Initialize extensions outside of app context
+
 db = SQLAlchemy()
 cache = Cache()
 auth = HTTPBasicAuth()
@@ -19,11 +19,11 @@ def create_app(register_blueprints=True):
     # Default Configuration
     app.config.update({
         # MASTER (write) - port 5432
-        'SQLALCHEMY_DATABASE_URI': os.getenv('DB_URI', 'postgresql://postgres:asghar@localhost:5432/bazaar_stage3'),
+        'SQLALCHEMY_DATABASE_URI': os.getenv('DB_URI', 'postgresql://postgres:asghar@localhost:5434/bazaar_stage3'),
         
         # REPLICA (read) - port 5433
         'SQLALCHEMY_BINDS': {
-            'replica': os.getenv('REPLICA_URI', 'postgresql://postgres:asghar@localhost:5433/bazaar_stage3')
+            'replica': os.getenv('REPLICA_URI', 'postgresql://postgres:asghar@localhost:5435/bazaar_stage3')
         },
         'CACHE_TYPE': 'RedisCache',
         'CACHE_REDIS_URL': os.getenv('REDIS_URI', 'redis://localhost:6379/0'),
@@ -52,9 +52,6 @@ def create_app(register_blueprints=True):
     if register_blueprints:
         from routes import api_bp
         app.register_blueprint(api_bp)
-    print(app.config['SQLALCHEMY_DATABASE_URI'])
-    print(app.config['SQLALCHEMY_BINDS']['replica'])
-
     return app
 
 # Helper function for rate limiting

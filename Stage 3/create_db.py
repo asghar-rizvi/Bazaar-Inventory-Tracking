@@ -1,6 +1,5 @@
 from app_factory import create_app, db
 from model import User, Store, ProductCatalog, StoreInventory
-import os
 import time
 
 def setup_database():
