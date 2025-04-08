@@ -1,96 +1,150 @@
-# Inventory Management System (v1 → v3)
+# 🏬 Inventory Management System (v1 → v3)
+
+An evolving, scalable inventory management solution developed in three stages — from a basic single-store prototype to a real-time, production-ready, multi-store architecture using Docker, Redis, PostgreSQL replication, and Celery task processing.
 
 ![Stage 3 Docker Deployment](./Stage%203/Output/Docker/Docker.png)
 
-## Table of Contents
-- [Design Decisions](#design-decisions)
-- [Assumptions](#assumptions)
-- [API Design](#api-design)
-- [Evolution Rationale](#evolution-rationale-v1--v3)
-- [Output Proofs](#output-proofs)
+---
+
+## 📚 Table of Contents
+
+- [🚀 Overview](#-overview)
+- [🧩 Technologies Used](#-technologies-used)
+- [🧠 Design Decisions](#-design-decisions)
+- [📦 System Evolution (v1 → v3)](#-system-evolution-v1--v3)
+- [🔐 Assumptions](#-assumptions)
+- [📡 API Endpoints](#-api-endpoints)
+- [📸 Output Proofs](#-output-proofs)
 
 ---
 
-## Design Decisions
+## 🚀 Overview
 
-### Stage 1 (Basic)
-- **SQLite Database**: Chosen for simplicity and zero-configuration during development.
-- **Movement-Based Inventory**: Tracked stock changes via `StockMovement` records for auditability.
-- **Single-File Architecture**: All logic in `app.py` for quick iteration.
+This project is a 3-stage Inventory Management System built using **Flask**. It progressively evolves into a **scalable, asynchronous, real-time** application ready for deployment. Each stage introduces architectural enhancements and feature expansions to support growing business requirements such as:
 
-### Stage 2 (Enhanced)
-- **PostgreSQL**: Upgraded for production readiness and scalability.
-- **Redis Rate Limiting**: Added throttling (2s/request) to prevent abuse ([Proof](./Stage%202/Output/Checking%20Throttling.png)).
-- **Multi-Store Support**: Introduced `Store` and `StoreInventory` models for business expansion.
-
-### Stage 3 (Production)
-- **Microservices Architecture**: Dockerized with Nginx load balancing.
-- **Real-Time Updates**: WebSocket notifications for inventory changes.
-- **Master-Replica DB**: PostgreSQL read replicas for performance ([Replication Proof](./Stage%203/Output/Database/tables%20replicating.png)).
-- **Async Processing**: Celery for background tasks (audit logs, stock updates).
+- Multi-store support  
+- User authentication  
+- Asynchronous processing  
+- WebSocket-based real-time updates  
+- Microservice deployment with Docker and Nginx  
 
 ---
 
-## Assumptions
-1. **Data Consistency**: 
-   - Inventory quantities never go negative (enforced at application layer).
-2. **Security**: 
-   - Stage 2+ assumes HTTPS in production (not shown in tests).
-3. **Performance**: 
-   - Redis availability is critical for Stage 2+ throttling and Stage 3 WebSockets.
-4. **User Roles**: 
-   - Stage 2+ assumes all authenticated users have equal privileges.
+## 🧩 Technologies Used
+
+| Category            | Tools / Libraries                             |
+|---------------------|-----------------------------------------------|
+| **Backend**         | Flask, Flask-Login (Authentication), SQLAlchemy |
+| **Database**        | SQLite (v1), PostgreSQL + Replication (v2-v3) |
+| **Caching & Queue** | Redis (Rate limiting, caching), Celery (Async tasks) |
+| **WebSockets**      | Flask-SocketIO (Real-time notifications)      |
+| **Deployment**      | Docker, Docker Compose, Nginx (Reverse proxy, load balancer) |
+| **Task Scheduling** | Celery (with Redis as broker)                 |
+| **Security**        | HTTPS-ready architecture (assumed in prod)    |
 
 ---
 
-## API Design
+## 🧠 Design Decisions
 
-### Stage 1
-| Endpoint | Method | Description | Proof |
-|----------|--------|-------------|-------|
-| `/product` | POST | Add product | [Add Product](./Stage%201/Output%20Images/Adding%20Product.png) |
-| `/products/<id>/stock` | POST | Record movement | [Update Stock](./Stage%201/Output%20Images/Updating%20Product%20Movement.png) |
-| `/inventory/products/<id>` | GET | View current stock | [View Inventory](./Stage%201/Output%20Images/View%20Inventory.png) |
+### 🔹 Stage 1 – Basic MVP
+- ✅ **SQLite**: Simple, no-configuration DB for development.
+- ✅ **Stock Movement**: Transactions stored for audit trails.
+- ✅ **Single File**: All logic in `app.py` for quick prototyping.
 
-### Stage 2
-| Endpoint | Method | Description | Proof |
-|----------|--------|-------------|-------|
-| `/register` | POST | User registration | [Register User](./Stage%202/Output/Register%20User.png) |
-| `/stores` | GET | List stores | [View Stores](./Stage%202/Output/View%20Stores.png) |
-| `/reports` | GET | Filterable reports | [Date Filter](./Stage%202/Output/View%20Report%20By%20Date.png) |
+### 🔹 Stage 2 – Business Expansion
+- 🔄 **PostgreSQL**: Switched to support concurrency and scaling.
+- 🔒 **Redis**: Implemented **rate-limiting** (2s/request) for API abuse protection.  
+  *[Proof](./Stage%202/Output/Checking%20Throttling.png)*
+- 🏪 **Multi-Store Support**: Introduced `Store`, `StoreInventory` tables for separation of store inventories.
 
-### Stage 3
-| Endpoint | Method | Description | Proof |
-|----------|--------|-------------|-------|
-| `/api/stock` | POST | Async stock update | [Input Stock](./Stage%203/Output/Postman/Input%20Stock.png) |
-| `/api/search` | GET | Real-time stock query | [Search Stock](./Stage%203/Output/Postman/Searching%20Stock.png) |
-
----
-
-## Evolution Rationale (v1 → v3)
-
-### Stage 1 → Stage 2
-- **Why PostgreSQL?**  
-  SQLite lacked concurrency for multi-store operations ([DB Health](./Stage%203/Output/Postman/Checking%20Health%20Of%20DB.png)).
-- **Why Redis?**  
-  Needed request throttling to protect APIs ([Throttling Proof](./Stage%202/Output/Checking%20Throttling.png)).
-
-### Stage 2 → Stage 3
-- **Why Docker?**  
-  Simplified deployment of complex services (Flask, Celery, Redis) ([Docker Proof](./Stage%203/Output/Docker/Docker.png)).
-- **Why WebSockets?**  
-  Eliminated polling for inventory updates (critical for multi-location dashboards).
-- **Why Master-Replica?**  
-  Improved read performance for reports ([Replication Proof](./Stage%203/Output/Database/data%20replicating.png)).
+### 🔹 Stage 3 – Production-Ready
+- 🐳 **Dockerized**: Separated services (Flask, Redis, Celery, PostgreSQL) via Docker.
+- 🌐 **Nginx Reverse Proxy**: For routing, load balancing.
+- 📡 **WebSocket Notifications**: Real-time inventory updates across clients.
+- 🧠 **Celery Tasks**: Async logging, stock sync, and report generation.
+- 🔁 **PostgreSQL Replication**: Read-replica setup for high-performance queries.  
+  *[Replication Proof](./Stage%203/Output/Database/data%20replicating.png)*
 
 ---
 
-## Output Proofs
-### Stage 1
+## 📦 System Evolution (v1 → v3)
+
+### v1 → v2
+- **Database Upgrade**: Moved from SQLite to PostgreSQL for better write concurrency.
+- **Rate Limiting**: Redis used to throttle requests and mitigate misuse.
+- **User Authentication**: Implemented via `Flask-Login`.
+
+### v2 → v3
+- **Containerization**: Simplified deployment using Docker Compose.
+- **Load Balancing**: Handled via Nginx and potential horizontal scaling.
+- **Real-Time UX**: Eliminated polling via WebSockets.
+- **Async Workflows**: Handled stock updates and logs in background via Celery.
+
+---
+
+## 🔐 Assumptions
+
+1. **Inventory cannot go negative** — enforced at the application layer.
+2. **HTTPS assumed** for production environments (Nginx config-ready).
+3. **Redis is critical** — required for throttling, WebSockets, and Celery.
+4. **User permissions** — All authenticated users currently share the same access level (fine-grained roles can be a future enhancement).
+
+---
+
+## 📡 API Endpoints
+
+### 📍 Stage 1
+
+| Method | Endpoint                        | Description                  | Proof |
+|--------|----------------------------------|------------------------------|-------|
+| POST   | `/product`                      | Add a new product            | ![Add](./Stage%201/Output%20Images/Adding%20Product.png) |
+| POST   | `/products/<id>/stock`          | Add stock movement           | ![Stock](./Stage%201/Output%20Images/Updating%20Product%20Movement.png) |
+| GET    | `/inventory/products/<id>`      | View product inventory       | ![Inventory](./Stage%201/Output%20Images/View%20Inventory.png) |
+
+---
+
+### 📍 Stage 2
+
+| Method | Endpoint        | Description              | Proof |
+|--------|------------------|--------------------------|-------|
+| POST   | `/register`     | User registration         | ![Register](./Stage%202/Output/Register%20User.png) |
+| GET    | `/stores`       | List available stores     | ![Stores](./Stage%202/Output/View%20Stores.png) |
+| GET    | `/reports`      | Generate inventory reports | ![Report](./Stage%202/Output/View%20Report%20By%20Date.png) |
+
+---
+
+### 📍 Stage 3
+
+| Method | Endpoint        | Description              | Proof |
+|--------|------------------|--------------------------|-------|
+| POST   | `/api/stock`     | Async stock update        | ![Stock](./Stage%203/Output/Postman/Input%20Stock.png) |
+| GET    | `/api/search`    | Real-time stock search    | ![Search](./Stage%203/Output/Postman/Searching%20Stock.png) |
+
+---
+
+## 📸 Output Proofs
+
+### ✅ Stage 1
 - [Full Inventory Lifecycle](./Stage%201/Output%20Images/View%20Inventory%20After%20Updating.png)
 
-### Stage 2
+### ✅ Stage 2
 - [Store-Specific Report](./Stage%202/Output/View%20Report%20By%20Store%20id.png)
 
-### Stage 3
-- [Post-API Data Sync](./Stage%203/Output/Database/After%20Api%20Data%20replicated.png)
+### ✅ Stage 3
+- [Post-API Data Replication](./Stage%203/Output/Database/After%20Api%20Data%20replicated.png)
+
+---
+
+## 🧭 Future Improvements
+
+- 🔐 Implement user roles: Admin, Store Manager, Viewer.
+- 📈 Add analytics dashboards.
+- 📱 Build a responsive frontend using React/Vue + Bootstrap.
+- 🚨 Alert system for low stock levels via email/SMS.
+
+---
+
+## 🙌 Contributing
+
+Interested in contributing? Fork the repo, create a branch, and submit a PR.
+
