@@ -48,9 +48,9 @@
 ### Stage 1
 | Endpoint | Method | Description | Proof |
 |----------|--------|-------------|-------|
-| `/product` | POST | Add product | [Add Product](./Stage%201/Output/Adding%20Product.png) |
-| `/products/<id>/stock` | POST | Record movement | [Update Stock](./Stage%201/Output/Updating%20Product%20Movement.png) |
-| `/inventory/products/<id>` | GET | View current stock | [View Inventory](./Stage%201/Output/View%20Inventory.png) |
+| `/product` | POST | Add product | [Add Product](./Stage%201/Output%20Images/Adding%20Product.png) |
+| `/products/<id>/stock` | POST | Record movement | [Update Stock](./Stage%201/Output%20Images/Updating%20Product%20Movement.png) |
+| `/inventory/products/<id>` | GET | View current stock | [View Inventory](./Stage%201/Output%20Images/View%20Inventory.png) |
 
 ### Stage 2
 | Endpoint | Method | Description | Proof |
@@ -87,7 +87,7 @@
 
 ## Output Proofs
 ### Stage 1
-- [Full Inventory Lifecycle](./Stage%201/Output/View%20Inventory%20After%20Updating.png)
+- [Full Inventory Lifecycle](./Stage%201/Output%20Images/View%20Inventory%20After%20Updating.png)
 
 ### Stage 2
 - [Store-Specific Report](./Stage%202/Output/View%20Report%20By%20Store%20id.png)
