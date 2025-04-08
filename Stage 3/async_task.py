@@ -45,9 +45,8 @@ def async_stock_update(self, store_id, product_id, quantity_change, user_id="sys
     try:
         from app_factory import db, socketio
         from model import StoreInventory
-        
-        # Create a Flask app context for this task
         from flask import Flask
+        
         app = Flask(__name__)
         app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DB_URI', 'postgresql://postgres:asghar@localhost/Bazaar_Stage3')
         db.init_app(app)
@@ -59,7 +58,6 @@ def async_stock_update(self, store_id, product_id, quantity_change, user_id="sys
             ).first()
             
             if not item:
-                # Create new inventory item if it doesn't exist
                 item = StoreInventory(
                     store_id=store_id,
                     product_id=product_id,
@@ -72,7 +70,6 @@ def async_stock_update(self, store_id, product_id, quantity_change, user_id="sys
             item.last_updated = datetime.utcnow()
             db.session.commit()
             
-            # Log audit
             log_audit.delay(
                 user_id=user_id,
                 action="stock_update",
@@ -83,7 +80,6 @@ def async_stock_update(self, store_id, product_id, quantity_change, user_id="sys
                 ip_address=None
             )
             
-            # Real-time update via websocket
             update_data = {
                 'product_id': product_id,
                 'quantity': item.quantity,
@@ -91,7 +87,6 @@ def async_stock_update(self, store_id, product_id, quantity_change, user_id="sys
                 'timestamp': datetime.utcnow().isoformat()
             }
             
-            # Send websocket notification (outside app context, will be picked up by main app)
             socketio.emit('stock_update', update_data, room=f"stock_{store_id}_{product_id}")
             
             return True

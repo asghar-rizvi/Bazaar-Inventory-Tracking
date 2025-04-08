@@ -1,4 +1,3 @@
-# routes.py
 from sqlalchemy.orm import scoped_session, sessionmaker
 from flask import Blueprint, request, jsonify, current_app, g
 from flask_socketio import join_room
@@ -9,7 +8,6 @@ from functools import wraps
 
 api_bp = Blueprint('api', __name__)
 
-# User Validation 
 @auth.verify_password
 def verify_password(username, password):
     user = User.query.filter_by(username=username).first()
@@ -62,11 +60,9 @@ def register_user():
     try:
         data = request.get_json()
         
-        # Check if username already exists
         if User.query.filter_by(username=data['username']).first():
             return jsonify({"error": "Username already exists"}), 409
             
-        # Create new user
         new_user = User(username=data['username'])
         new_user.set_password(data['password'])
         
@@ -197,10 +193,8 @@ def get_audit_logs():
 @api_bp.route('/health', methods=['GET'])
 def health_check():
     try:
-        # Test master
         db.session.execute("SELECT 1")
         
-        # Test replica
         replica_engine = db.get_engine(current_app, bind='replica')
         replica_engine.execute("SELECT 1")
         

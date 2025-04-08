@@ -14,13 +14,12 @@ auth = HTTPBasicAuth()
 
 def create_app(register_blueprints=True):
     app = Flask(__name__)
-    
-    # Default Configuration
+
     app.config.update({
-        # MASTER (write) - port 5432
+        # MASTER (write)
         'SQLALCHEMY_DATABASE_URI': os.getenv('DB_URI', 'postgresql://postgres:asghar@localhost:5434/bazaar_stage3'),
         
-        # REPLICA (read) - port 5433
+        # SLAVE (read)
         'SQLALCHEMY_BINDS': {
             'replica': os.getenv('REPLICA_URI', 'postgresql://postgres:asghar@localhost:5434/bazaar_stage3')
         },
@@ -39,11 +38,9 @@ def create_app(register_blueprints=True):
         async_mode='eventlet'
     )
     
-    # Initialize extensions with app
     db.init_app(app)
     cache.init_app(app)
     
-    # Set up rate limiting
     limiter = Limiter(
         app=app,
         key_func=get_limiter_key,
@@ -51,7 +48,6 @@ def create_app(register_blueprints=True):
         default_limits=["200/day", "50/hour"]
     )
     
-    # Register blueprints
     if register_blueprints:
         from routes import api_bp
         app.register_blueprint(api_bp)

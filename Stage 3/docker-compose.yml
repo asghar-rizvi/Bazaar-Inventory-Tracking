@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Load Balancer
   nginx:
     image: nginx:latest
     ports:
@@ -14,7 +13,6 @@ services:
     networks:
       - app_network
 
-  # Flask Instances
   flask1:
     build: .
     environment:
