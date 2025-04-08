@@ -2,6 +2,12 @@ from celery import Celery
 from datetime import datetime
 import os
 
+REDIS_URI = os.environ.get('REDIS_URI', 'redis://redis:6379/0')
+CELERY_BROKER = os.environ.get('CELERY_BROKER', 'redis://redis:6379/0')
+CELERY_BACKEND = os.environ.get('CELERY_BACKEND', 'redis://redis:6379/0')
+
+
+
 def make_celery(app):
     celery = Celery(
         app.import_name,
@@ -21,10 +27,18 @@ def make_celery(app):
 # Create a standalone celery instance
 celery = Celery(
     'inventory_app',
-    broker=os.getenv('CELERY_BROKER', 'redis://localhost:6379/0'),
-    backend=os.getenv('CELERY_BACKEND', 'redis://localhost:6379/0')
+    broker=CELERY_BROKER,
+    backend=CELERY_BACKEND
 )
 
+celery.conf.update(
+    result_expires=3600,
+    task_serializer='json',
+    accept_content=['json'],
+    result_serializer='json',
+    timezone='UTC',
+    enable_utc=True,
+)
 @celery.task(bind=True, max_retries=3)
 def async_stock_update(self, store_id, product_id, quantity_change, user_id="system"):
     """Background stock update with audit logging"""

@@ -11,6 +11,8 @@ services:
     depends_on:
       - flask1
       - flask2
+    networks:
+      - app_network
 
   # Flask Instances
   flask1:
@@ -18,20 +20,36 @@ services:
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=production
+      - INSTANCE_NAME=flask1
+      - DB_URI=postgresql://postgres:asghar@db_master:5434/bazaar_stage3
+      - REPLICA_URI=postgresql://postgres:asghar@db_replica:5435/bazaar_stage3
+      - REDIS_URI=redis://redis:6379/0
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
       - db_master
       - db_replica
+    networks:
+      - app_network
 
   flask2:
     build: .
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=production
+      - INSTANCE_NAME=flask2
+      - DB_URI=postgresql://postgres:asghar@db_master:5434/bazaar_stage3
+      - REPLICA_URI=postgresql://postgres:asghar@db_replica:5435/bazaar_stage3
+      - REDIS_URI=redis://redis:6379/0
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
       - db_master
       - db_replica
+    networks:
+      - app_network
 
   # Celery Worker
   celery:
@@ -39,16 +57,28 @@ services:
     command: celery -A async_task.celery worker --loglevel=info
     environment:
       - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - DB_URI=postgresql://postgres:asghar@db_master:5434/bazaar_stage3
+      - REPLICA_URI=postgresql://postgres:asghar@db_replica:5435/bazaar_stage3
+      - REDIS_URI=redis://redis:6379/0
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
       - db_master
       - db_replica
+    networks:
+      - app_network
 
   # Redis (Broker + Cache)
   redis:
     image: redis:latest
     ports:
       - "6379:6379"
+    networks:
+      - app_network
+    volumes:
+      - redis_data:/data
 
   # PostgreSQL Master
   db_master:
@@ -58,9 +88,12 @@ services:
       POSTGRES_PASSWORD: asghar
       POSTGRES_DB: bazaar_stage3
     ports:
-      - "5434:5434"
+      - "5434:5432"
     volumes:
       - pg_master_data:/var/lib/postgresql/data
+      - ./pg_master_init.sh:/docker-entrypoint-initdb.d/init.sh
+    networks:
+      - app_network
 
   # PostgreSQL Replica
   db_replica:
@@ -69,18 +102,25 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: asghar
       POSTGRES_DB: bazaar_stage3
+      MASTER_HOST: db_master
+      MASTER_PORT: 5432
+      MASTER_USER: postgres
+      MASTER_PASSWORD: asghar
     ports:
-      - "5435:5435"
+      - "5435:5432"
     volumes:
       - pg_replica_data:/var/lib/postgresql/data
-    command: >
-      bash -c "
-      echo 'wal_level = replica' >> /var/lib/postgresql/data/postgresql.conf &&
-      echo 'max_wal_senders = 3' >> /var/lib/postgresql/data/postgresql.conf &&
-      echo 'hot_standby = on' >> /var/lib/postgresql/data/postgresql.conf &&
-      docker-entrypoint.sh postgres
-      "
+      - ./pg_replica_init.sh:/docker-entrypoint-initdb.d/init.sh
+    depends_on:
+      - db_master
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
 
 volumes:
   pg_master_data:
   pg_replica_data:
+  redis_data:

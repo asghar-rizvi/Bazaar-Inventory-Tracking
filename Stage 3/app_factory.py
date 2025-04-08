@@ -11,7 +11,6 @@ import os
 db = SQLAlchemy()
 cache = Cache()
 auth = HTTPBasicAuth()
-socketio = SocketIO()
 
 def create_app(register_blueprints=True):
     app = Flask(__name__)
@@ -23,7 +22,7 @@ def create_app(register_blueprints=True):
         
         # REPLICA (read) - port 5433
         'SQLALCHEMY_BINDS': {
-            'replica': os.getenv('REPLICA_URI', 'postgresql://postgres:asghar@localhost:5435/bazaar_stage3')
+            'replica': os.getenv('REPLICA_URI', 'postgresql://postgres:asghar@localhost:5434/bazaar_stage3')
         },
         'CACHE_TYPE': 'RedisCache',
         'CACHE_REDIS_URL': os.getenv('REDIS_URI', 'redis://localhost:6379/0'),
@@ -31,14 +30,18 @@ def create_app(register_blueprints=True):
         'CELERY_BROKER_URL': os.getenv('CELERY_BROKER', 'redis://localhost:6379/0'),
         'CELERY_RESULT_BACKEND': os.getenv('CELERY_BACKEND', 'redis://localhost:6379/0')
     })
-
-    # if config:
-    #     app.config.update(config)
+    REDIS_URI = os.environ.get('REDIS_URI', 'redis://redis:6379/0')
+    
+    socketio = SocketIO(
+        app, 
+        message_queue=REDIS_URI,
+        cors_allowed_origins="*", 
+        async_mode='eventlet'
+    )
     
     # Initialize extensions with app
     db.init_app(app)
     cache.init_app(app)
-    socketio.init_app(app, cors_allowed_origins="*")
     
     # Set up rate limiting
     limiter = Limiter(
@@ -52,9 +55,10 @@ def create_app(register_blueprints=True):
     if register_blueprints:
         from routes import api_bp
         app.register_blueprint(api_bp)
+    
+
     return app
 
-# Helper function for rate limiting
 def get_limiter_key():
     from flask import request
     if auth.current_user():
